@@ -21,7 +21,7 @@ import jwt from 'jsonwebtoken';
 
                 const hashedPassword = await bcrypt.hash(password, 10);
                 const user = await UserService.createUser(name, email, hashedPassword);
-                const token = jwt.sign({userId: user.id}, process.env.JWT_SECRET, {expiresIn: '1h'});
+                const token = jwt.sign({userId: user.id, email: user.email}, process.env.JWT_SECRET, {expiresIn: '1h'});
                 return { success: true, token, user };
             },
             login: async (_, {email, password}) => {
@@ -34,7 +34,7 @@ import jwt from 'jsonwebtoken';
                 if(!isPasswordValid) {
                     return { success: false, error: "Невірний пароль" };
                 }
-                const token = jwt.sign({userId: user.id}, process.env.JWT_SECRET, {expiresIn: '1h'});
+                const token = jwt.sign({userId: user.id, email: user.email}, process.env.JWT_SECRET, {expiresIn: '1h'});
                 return { success: true, token, user };
             },
         },
