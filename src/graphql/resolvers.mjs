@@ -37,6 +37,49 @@ import jwt from 'jsonwebtoken';
                 const token = jwt.sign({userId: user.id, email: user.email}, process.env.JWT_SECRET, {expiresIn: '1h'});
                 return { success: true, token, user };
             },
+            updateUser: async (_, {name,email,password},context) => {
+                if(!context || !context.user) {
+                    throw new Error("Не авторизовано");
+                }
+
+                const userId = context.user.id;
+                const updateData = {}
+                if (name !== undefined) {
+                    updateData.name = name;
+                }
+
+                if (email !== undefined) {
+                    const existingUser = await UserService.findUserByEmail(email);
+                    if (existingUser && existingUser.id !== userId) {
+                        throw new Error("Цей email вже використовується іншим користувачем");
+                    }
+                    updateData.email = email;
+                }
+
+                if (password !== undefined) {
+                    updateData.password = await bcrypt.hash(password, 10);
+                }
+                // updateData.updated_at = new Date().toISOString();
+                console.log('Update data:', updateData);
+
+                if(Object.keys(updateData).length === 0) {
+                    throw new Error("Немає даних для оновлення");
+                }
+
+                const updatedUser = await UserService.updateUser(userId, updateData);
+
+                if (!updatedUser) {
+                    throw new Error("Не вдалося оновити користувача або користувач не знайдений");
+                }
+
+                const token = jwt.sign(
+                    { userId: updatedUser.id, email: updatedUser.email }, 
+                    process.env.JWT_SECRET, 
+                    { expiresIn: '1h' }
+                );
+
+                return { success: true, token, user: updatedUser };
+            }
         },
 }
 

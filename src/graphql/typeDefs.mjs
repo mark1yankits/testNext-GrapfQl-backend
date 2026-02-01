@@ -8,6 +8,8 @@ const typeDefs =`
         name: String!
         password: String!
         email: String!
+        createdAt: String!
+        updatedAt: String!
     }
         
 
@@ -20,6 +22,7 @@ const typeDefs =`
     type Mutation {
         login(email: String!, password: String!): AuthPayload  
         register(name: String!, email: String!, password: String!): AuthPayload 
+        updateUser(name: String, email: String, password: String): AuthPayload
     }
 `;
 

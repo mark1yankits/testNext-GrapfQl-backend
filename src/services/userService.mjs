@@ -35,6 +35,21 @@ const UserService = {
         }
 
         return data;
+    },
+    async updateUser (id,updateData) {
+        const {data,error} = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+
+        if(error) {
+            console.error("Помилка при оновленні користувача:", error);
+            throw new Error(`Помилка при оновленні: ${error.message}`);
+        }
+
+        return data;
     }
 }
 
