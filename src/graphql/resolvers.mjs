@@ -3,15 +3,15 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 
  const resolvers = {
-    Query: {
-        me: async (_, __, context) => {
-            if (!context || !context.user || !context.user.email) {
-                throw new Error("Не авторизовано");
-            }
-            const user = await UserService.findUserByEmail(context.user.email);
-            return user;
+        Query: {
+            me: async (_, __, context) => {
+                if (!context || !context.user || !context.user.email) {
+                    throw new Error("Не авторизовано");
+                }
+                const user = await UserService.findUserByEmail(context.user.email);
+                return user;
+            },
         },
-    },
         Mutation: {
             register: async (_, { name, email, password }) => {
                 const newUser =  await UserService.findUserByEmail(email);
@@ -24,18 +24,21 @@ import jwt from 'jsonwebtoken';
                 const token = jwt.sign({userId: user.id}, process.env.JWT_SECRET, {expiresIn: '1h'});
                 return { success: true, token, user };
             },
-            login: (_, {email, password}) => {
-                const user = user.find(
-                    user=> user.email === email && user.password === password
-                )
-
+            login: async (_, {email, password}) => {
+                const user = await UserService.findUserByEmail(email)
                 if(!user) {
-                    throw new Error("Невірний email або пароль");
+                    return { success: false, error: "такого користувача не знайдено" };
                 }
 
-                return "Успішний вхід!";
-            }
-    }
- };
+                const isPasswordValid = await bcrypt.compare(password, user.password);
+                if(!isPasswordValid) {
+                    return { success: false, error: "Невірний пароль" };
+                }
+                const token = jwt.sign({userId: user.id}, process.env.JWT_SECRET, {expiresIn: '1h'});
+                return { success: true, token, user };
+            },
+        },
+}
 
- export default resolvers;
+
+export default resolvers;
