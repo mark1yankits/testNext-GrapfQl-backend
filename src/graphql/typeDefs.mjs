@@ -1,6 +1,7 @@
 const typeDefs =`
     type Query {
         me: User
+        chats: [Chat!]!
     }
     
     type User {
@@ -11,7 +12,18 @@ const typeDefs =`
         createdAt: String!
         updatedAt: String!
     }
+
+    type Chat{
+     id: ID!
+     name: String!
+     description: String
+     ownerid: ID!
+     createdAt: String!
+    }
         
+    type Subscription {
+        chatCreated: Chat!
+    }
 
     type AuthPayload {
         success: Boolean!
@@ -22,6 +34,7 @@ const typeDefs =`
     type Mutation {
         login(email: String!, password: String!): AuthPayload  
         register(name: String!, email: String!, password: String!): AuthPayload 
+        createChat(name: String!, description: String): Chat
         updateUser(name: String, email: String, password: String): AuthPayload
     }
 `;

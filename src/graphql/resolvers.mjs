@@ -1,6 +1,10 @@
 import UserService from '../services/userService.mjs';
+import ChatService from '../services/chatSercuve.mjs';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { PubSub } from 'graphql-subscriptions';
+
+const pubsub = new PubSub();
 
  const resolvers = {
         Query: {
@@ -11,6 +15,10 @@ import jwt from 'jsonwebtoken';
                 const user = await UserService.findUserByEmail(context.user.email);
                 return user;
             },
+            chats: async(_,__, context) => {
+                if(!context.user) throw new Error("Не авторизовано");
+                return ChatService.getChats();
+            }
         },
         Mutation: {
             register: async (_, { name, email, password }) => {
@@ -79,8 +87,20 @@ import jwt from 'jsonwebtoken';
                 );
 
                 return { success: true, token, user: updatedUser };
-            }
+            },
+            createChat: async(_, {name, description}, context) => {
+                if(!context.user) throw new Error("Не авторизовано");
+
+                const newChat = await ChatService.createChat(name, description, context.user.id);
+                pubsub.publish('CHAT_CREATED', {chatCreated: newChat});
+                return newChat;
+            },
         },
+        Subscription: {
+            chatCreated: {
+                subscribe: () => pubsub.asyncIterator(['CHAT_CREATED'])
+            }
+        }
 }
 
 
