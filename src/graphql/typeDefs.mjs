@@ -2,6 +2,7 @@ const typeDefs =`
     type Query {
         me: User
         chats: [Chat!]!
+        chat(id: ID!): Chat
     }
     
     type User {

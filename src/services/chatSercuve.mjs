@@ -1,11 +1,13 @@
 import supabase from '../config/supabase.mjs';
 
 const ChatService = {
-    async getChats() {
+    async getChats( userId ) {
         const { data, error } = await supabase
             .from('chats')
             .select('*')
+            .eq('ownerid', userId)
             .order('createdAt', { ascending: false });
+
 
         if (error) {
             console.error('Помилка при отриманні чатів:', error);
@@ -33,6 +35,22 @@ const ChatService = {
         }
         return data;
     },
+
+    async getChatById(id) {
+        const {data, error} = await supabase
+        .from('chats')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+
+        if(error && error.code !== 'PGRST116') {
+            console.error('Помилка при отриманні чату:', error);
+            throw new Error(`Помилка при отриманні чату: ${error.message}`);
+        }
+
+        return data || null;
+    }
 };
 
 export default ChatService;

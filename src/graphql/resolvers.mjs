@@ -15,9 +15,18 @@ const pubsub = new PubSub();
                 const user = await UserService.findUserByEmail(context.user.email);
                 return user;
             },
+            chat: async(_, {id}, context) => {
+                if(!context.user) throw new Error("Не авторизовано");
+
+                const user = await UserService.findUserByEmail(context.user.email);
+
+                if (!user) throw new Error("Користувача не знайдено");
+
+                return ChatService.getChatById(id);
+            },
             chats: async(_,__, context) => {
                 if(!context.user) throw new Error("Не авторизовано");
-                return ChatService.getChats();
+                return ChatService.getChats(context.user.id);
             }
         },
         Mutation: {
