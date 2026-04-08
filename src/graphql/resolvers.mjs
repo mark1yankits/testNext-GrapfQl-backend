@@ -15,18 +15,22 @@ const pubsub = new PubSub();
                 const user = await UserService.findUserByEmail(context.user.email);
                 return user;
             },
-            chat: async(_, {id}, context) => {
-                if(!context.user) throw new Error("Не авторизовано");
-
-                const user = await UserService.findUserByEmail(context.user.email);
-
-                if (!user) throw new Error("Користувача не знайдено");
-
-                return ChatService.getChatById(id);
+            chat: async (_, { id }, context) => {
+                if (!context.user) throw new Error("Не авторизовано");
+                return await ChatService.getChatById(id);
             },
             chats: async(_,__, context) => {
                 if(!context.user) throw new Error("Не авторизовано");
                 return ChatService.getChats(context.user.id);
+            },
+            users: async (_, __, context) => {
+                if(!context.user) throw new Error("Не авторизовано");
+                return UserService.getAllUsers();
+            }
+        },
+        Chat: {
+            members: async (parent) => {
+                return await ChatService.getChatMembers(parent.id);
             }
         },
         Mutation: {
@@ -97,11 +101,17 @@ const pubsub = new PubSub();
 
                 return { success: true, token, user: updatedUser };
             },
-            createChat: async(_, {name, description}, context) => {
-                if(!context.user) throw new Error("Не авторизовано");
-
-                const newChat = await ChatService.createChat(name, description, context.user.id);
-                pubsub.publish('CHAT_CREATED', {chatCreated: newChat});
+            createChat: async (_, { name, description, memberIds }, context) => {
+                if (!context.user) throw new Error("Не авторизовано");
+    
+                const newChat = await ChatService.createChat(
+                    name, 
+                    description, 
+                    context.user.userId, 
+                    memberIds 
+                );
+    
+                pubsub.publish('CHAT_CREATED', { chatCreated: newChat });
                 return newChat;
             },
         },
