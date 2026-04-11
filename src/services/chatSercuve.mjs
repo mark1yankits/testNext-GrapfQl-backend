@@ -68,6 +68,8 @@ const ChatService = {
 
         const allMemberIds = Array.from(new Set([ownerId, ...memberIds])).filter(Boolean);
 
+        console.log("СПИСОК ВСІХ УЧАСНИКІВ ДЛЯ ЗАПИСУ:", allMemberIds);
+
         const membersToInsert = allMemberIds.map(uid => ({
             chat_id: chatData.id,
             user_id: uid,

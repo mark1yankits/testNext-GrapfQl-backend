@@ -130,7 +130,7 @@ const resolvers = {
                 name,
                 description,
                 currentUserId,
-                memberIds || []
+                memberIds 
             );
 
             pubsub.publish('CHAT_CREATED', { chatCreated: newChat });
