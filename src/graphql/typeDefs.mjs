@@ -45,7 +45,6 @@ const typeDefs =`
     type Mutation {
         login(email: String!, password: String!): AuthPayload  
         register(name: String!, email: String!, password: String!): AuthPayload 
-        createChat(name: String!, description: String): Chat
         updateUser(name: String, email: String, password: String): AuthPayload
         createChat(name: String!, description: String, memberIds: [ID!]!): Chat!
     }
