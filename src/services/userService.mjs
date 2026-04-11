@@ -50,7 +50,26 @@ const UserService = {
         }
 
         return data;
-    }
+    },
+    async getAllUsers() {
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, name, email, createdAt:created_at')
+            .order('name', { ascending: true });
+    
+        if (error) throw new Error(error.message);
+        return data;
+    },
+    async getUserById(id) {
+        const { data, error } = await supabase
+            .from('users')
+            .select('id, name, email, createdAt:created_at')
+            .eq('id', id)
+            .single();
+    
+        if (error) return null;
+        return data;
+    },
 }
 
 export default UserService;

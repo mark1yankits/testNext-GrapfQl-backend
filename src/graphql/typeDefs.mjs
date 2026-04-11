@@ -21,7 +21,7 @@ const typeDefs =`
      id: ID!
      name: String!
      description: String
-     ownerid: ID!
+     owner_id: ID!
      createdAt: String!
      members: [ChatMember!]!
     }

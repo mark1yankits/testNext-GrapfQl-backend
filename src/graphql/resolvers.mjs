@@ -6,121 +6,143 @@ import { PubSub } from 'graphql-subscriptions';
 
 const pubsub = new PubSub();
 
- const resolvers = {
-        Query: {
-            me: async (_, __, context) => {
-                if (!context || !context.user || !context.user.email) {
-                    throw new Error("Не авторизовано");
-                }
-                const user = await UserService.findUserByEmail(context.user.email);
-                return user;
-            },
-            chat: async (_, { id }, context) => {
-                if (!context.user) throw new Error("Не авторизовано");
-                return await ChatService.getChatById(id);
-            },
-            chats: async(_,__, context) => {
-                if(!context.user) throw new Error("Не авторизовано");
-                return ChatService.getChats(context.user.id);
-            },
-            users: async (_, __, context) => {
-                if(!context.user) throw new Error("Не авторизовано");
-                return UserService.getAllUsers();
+const resolvers = {
+    Query: {
+        me: async (_, __, context) => {
+            if (!context?.user?.email) {
+                throw new Error("Не авторизовано");
             }
+            return await UserService.findUserByEmail(context.user.email);
         },
-        Chat: {
-            members: async (parent) => {
-                return await ChatService.getChatMembers(parent.id);
-            }
+        chat: async (_, { id }, context) => {
+            if (!context.user) throw new Error("Не авторизовано");
+            return await ChatService.getChatById(id);
         },
-        Mutation: {
-            register: async (_, { name, email, password }) => {
-                const newUser =  await UserService.findUserByEmail(email);
-                if(newUser) {
-                    throw new Error("Користувач з таким email вже існує");
-                }
-
-                const hashedPassword = await bcrypt.hash(password, 10);
-                const user = await UserService.createUser(name, email, hashedPassword);
-                const token = jwt.sign({userId: user.id, email: user.email}, process.env.JWT_SECRET, {expiresIn: '1h'});
-                return { success: true, token, user };
-            },
-            login: async (_, {email, password}) => {
-                const user = await UserService.findUserByEmail(email)
-                if(!user) {
-                    return { success: false, error: "такого користувача не знайдено" };
-                }
-
-                const isPasswordValid = await bcrypt.compare(password, user.password);
-                if(!isPasswordValid) {
-                    return { success: false, error: "Невірний пароль" };
-                }
-                const token = jwt.sign({userId: user.id, email: user.email}, process.env.JWT_SECRET, {expiresIn: '1h'});
-                return { success: true, token, user };
-            },
-            updateUser: async (_, {name,email,password},context) => {
-                if(!context || !context.user) {
-                    throw new Error("Не авторизовано");
-                }
-
-                const userId = context.user.id;
-                const updateData = {}
-                if (name !== undefined) {
-                    updateData.name = name;
-                }
-
-                if (email !== undefined) {
-                    const existingUser = await UserService.findUserByEmail(email);
-                    if (existingUser && existingUser.id !== userId) {
-                        throw new Error("Цей email вже використовується іншим користувачем");
-                    }
-                    updateData.email = email;
-                }
-
-                if (password !== undefined) {
-                    updateData.password = await bcrypt.hash(password, 10);
-                }
-                // updateData.updated_at = new Date().toISOString();
-                console.log('Update data:', updateData);
-
-                if(Object.keys(updateData).length === 0) {
-                    throw new Error("Немає даних для оновлення");
-                }
-
-                const updatedUser = await UserService.updateUser(userId, updateData);
-
-                if (!updatedUser) {
-                    throw new Error("Не вдалося оновити користувача або користувач не знайдений");
-                }
-
-                const token = jwt.sign(
-                    { userId: updatedUser.id, email: updatedUser.email }, 
-                    process.env.JWT_SECRET, 
-                    { expiresIn: '1h' }
-                );
-
-                return { success: true, token, user: updatedUser };
-            },
-            createChat: async (_, { name, description, memberIds }, context) => {
-                if (!context.user) throw new Error("Не авторизовано");
-    
-                const newChat = await ChatService.createChat(
-                    name, 
-                    description, 
-                    context.user.userId, 
-                    memberIds 
-                );
-    
-                pubsub.publish('CHAT_CREATED', { chatCreated: newChat });
-                return newChat;
-            },
+        chats: async (_, __, context) => {
+            if (!context.user) throw new Error("Не авторизовано");
+            const currentUserId = context.user.userId || context.user.id;
+            return ChatService.getChats(currentUserId);
         },
-        Subscription: {
-            chatCreated: {
-                subscribe: () => pubsub.asyncIterator(['CHAT_CREATED'])
-            }
+        users: async (_, __, context) => {
+            if (!context.user) throw new Error("Не авторизовано");
+            return UserService.getAllUsers();
         }
-}
+    },
 
+    User: {
+        createdAt: (parent) => parent.createdAt || parent.created_at
+    },
+
+    Chat: {
+        createdAt: (parent) => parent.createdAt || parent.created_at,
+        owner_id: (parent) => parent.owner_id || parent.ownerid,
+        members: async (parent) => {
+            return await ChatService.getChatMembers(parent.id);
+        }
+    },
+
+    ChatMember: {
+        joined_at: (parent) => parent.joined_at || parent.joinedAt,
+        user: async (parent) => {
+            if (parent.users) return parent.users;
+            if (parent.user) return parent.user;
+            return await UserService.getUserById(parent.user_id);
+        }
+    },
+
+    Mutation: {
+        register: async (_, { name, email, password }) => {
+            const newUser = await UserService.findUserByEmail(email);
+            if (newUser) {
+                throw new Error("Користувач з таким email вже існує");
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const user = await UserService.createUser(name, email, hashedPassword);
+            const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+            return { success: true, token, user };
+        },
+
+        login: async (_, { email, password }) => {
+            const user = await UserService.findUserByEmail(email);
+            if (!user) {
+                return { success: false, error: "Такого користувача не знайдено" };
+            }
+
+            const isPasswordValid = await bcrypt.compare(password, user.password);
+            if (!isPasswordValid) {
+                return { success: false, error: "Невірний пароль" };
+            }
+            const token = jwt.sign({ userId: user.id, email: user.email }, process.env.JWT_SECRET, { expiresIn: '1h' });
+            return { success: true, token, user };
+        },
+
+        updateUser: async (_, { name, email, password }, context) => {
+            if (!context?.user) {
+                throw new Error("Не авторизовано");
+            }
+
+            const userId = context.user.userId || context.user.id;
+            const updateData = {};
+            
+            if (name !== undefined) updateData.name = name;
+
+            if (email !== undefined) {
+                const existingUser = await UserService.findUserByEmail(email);
+                if (existingUser && existingUser.id !== userId) {
+                    throw new Error("Цей email вже використовується іншим користувачем");
+                }
+                updateData.email = email;
+            }
+
+            if (password !== undefined) {
+                updateData.password = await bcrypt.hash(password, 10);
+            }
+
+            if (Object.keys(updateData).length === 0) {
+                throw new Error("Немає даних для оновлення");
+            }
+
+            const updatedUser = await UserService.updateUser(userId, updateData);
+            if (!updatedUser) {
+                throw new Error("Не вдалося оновити користувача");
+            }
+
+            const token = jwt.sign(
+                { userId: updatedUser.id, email: updatedUser.email },
+                process.env.JWT_SECRET,
+                { expiresIn: '1h' }
+            );
+
+            return { success: true, token, user: updatedUser };
+        },
+
+        createChat: async (_, { name, description, memberIds }, context) => {
+            if (!context.user) throw new Error("Не авторизовано");
+
+            const currentUserId = context.user.userId || context.user.id || context.user.sub;
+
+            if (!currentUserId) {
+                throw new Error("ID користувача не знайдено в токені. Спробуйте перелогінитися.");
+            }
+
+            const newChat = await ChatService.createChat(
+                name,
+                description,
+                currentUserId,
+                memberIds || []
+            );
+
+            pubsub.publish('CHAT_CREATED', { chatCreated: newChat });
+            return newChat;
+        },
+    },
+
+    Subscription: {
+        chatCreated: {
+            subscribe: () => pubsub.asyncIterator(['CHAT_CREATED'])
+        }
+    }
+};
 
 export default resolvers;
