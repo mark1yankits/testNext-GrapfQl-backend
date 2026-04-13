@@ -2,9 +2,10 @@ import UserService from '../services/userService.mjs';
 import ChatService from '../services/chatSercuve.mjs';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
-import { PubSub } from 'graphql-subscriptions';
+import { pubsub, createAsyncIterator } from './pubsub.mjs'; 
+import { withFilter } from 'graphql-subscriptions';
 
-const pubsub = new PubSub();
+console.log('🚀 [PUBSUB] Instance methods:', Object.keys(pubsub));
 
 const resolvers = {
     Query: {
@@ -26,6 +27,10 @@ const resolvers = {
         users: async (_, __, context) => {
             if (!context.user) throw new Error("Не авторизовано");
             return UserService.getAllUsers();
+        },
+        messages: async (_, { chatId }, context) => {
+            if (!context.user) throw new Error("Не авторизовано");
+            return await ChatService.getMessages(chatId);
         }
     },
 
@@ -116,7 +121,6 @@ const resolvers = {
 
             return { success: true, token, user: updatedUser };
         },
-
         createChat: async (_, { name, description, memberIds }, context) => {
             if (!context.user) throw new Error("Не авторизовано");
 
@@ -136,11 +140,55 @@ const resolvers = {
             pubsub.publish('CHAT_CREATED', { chatCreated: newChat });
             return newChat;
         },
+        createMessage: async (_, { chatId, text }, context) => { 
+            if (!context.user) throw new Error('Не авторизовано');
+            const currentUserId = context.user.userId || context.user.id;
+            const newMessage = await ChatService.createMessage(chatId, currentUserId, text);
+            
+            console.log(`[SUBSCRIPTION] Публікація повідомлення для чату: ${chatId}`);
+            
+            if (typeof pubsub.publish !== 'function') {
+                console.error('❌ [ERROR] pubsub.publish is not a function! Check pubsub instance.');
+            }
+
+            // Використовуємо спільний канал для всіх повідомлень, фільтрація буде в Subscription
+            pubsub.publish('MESSAGE_SENT', { messageSent: newMessage });
+            
+            return newMessage;
+        },
+    },
+
+    Message: {
+        chatId: (parent) => parent.chatId || parent.chat_id,
+        userId: (parent) => parent.userId || parent.sender_id || parent.user_id || parent.senderId,
+        text: (parent) => parent.text || parent.content,
+        createdAt: (parent) => parent.createdAt || parent.created_at,
+        user: async (parent) => {
+            if (parent.user) return parent.user;
+            const uid = parent.userId || parent.sender_id || parent.user_id || parent.senderId;
+            return await UserService.getUserById(uid);
+        }
     },
 
     Subscription: {
         chatCreated: {
             subscribe: () => pubsub.asyncIterator(['CHAT_CREATED'])
+        },
+        messageSent: {
+            subscribe: withFilter(
+                (_, { chatId }) => {
+                    console.log(`🔌 [WS] Створення ітератора для MESSAGE_SENT (chatId: ${chatId})`);
+                    return createAsyncIterator(['MESSAGE_SENT']);
+                },
+                (payload, variables) => {
+                    const messageChatId = payload?.messageSent?.chatId || payload?.messageSent?.chat_id;
+                    const match = String(messageChatId) === String(variables.chatId);
+                    
+                    console.log(`📡 [WS] Фільтрація: ${messageChatId} vs ${variables.chatId} -> ${match ? 'SEND' : 'SKIP'}`);
+                    return match;
+                }
+            ),
+            resolve: (payload) => payload.messageSent
         }
     }
 };

@@ -1,8 +1,11 @@
 import supabase from '../config/supabase.mjs';
 
 const ChatService = {
+    
     async getChats(userId) {
+        
         console.log("Запит чатів для користувача ID:", userId);
+        
     
         const { data, error } = await supabase
             .from('chat_members')
@@ -98,26 +101,17 @@ const ChatService = {
                 user_id,
                 role,
                 joined_at,
-                users(
-                    id,
-                    name,
-                    email,
-                    created_at
-                )
+                user:user_id (id, name, email, created_at)
             `)
             .eq('chat_id', chatId);
-
-        if (error) {
-            console.error('Помилка при отриманні учасників:', error);
-            throw error;
-        }
-
+    
+        if (error) throw error;
+    
         return data.map(member => ({
-            ...member,
-            user: member.users ? {
-                ...member.users,
-                createdAt: member.users.created_at
-            } : null
+            user_id: member.user_id,
+            role: member.role,
+            joined_at: member.joined_at,
+            user: member.user
         }));
     },
 
@@ -140,7 +134,66 @@ const ChatService = {
             createdAt: data.created_at,
             owner_id: data.owner_id
         };
-    }
+    },
+
+    async getMessages(chatId) {
+        const { data, error } = await supabase 
+            .from('messages')
+            .select(`
+                id,
+                content,
+                chat_id,
+                sender_id,
+                created_at,
+                user:users!sender_id (id, name, email)
+            `)
+            .eq('chat_id', chatId)
+            .order('created_at', { ascending: true });
+    
+        if (error) throw error;
+    
+        return data.map(msg => ({
+            id: msg.id,
+            text: msg.content,        
+            chatId: msg.chat_id,      
+            senderId: msg.sender_id,  
+            createdAt: msg.created_at,
+            user: msg.user
+        }));
+    },
+    async createMessage(chatId, senderId, text) {
+        const { data, error } = await supabase
+            .from('messages')
+            .insert([{ 
+                chat_id: chatId, 
+                sender_id: senderId, 
+                content: text 
+            }])
+            .select(`
+                id,
+                content,
+                chat_id,
+                sender_id,
+                created_at,
+                user:users!sender_id (
+                    id,
+                    name
+                )
+            `)
+            .single();
+
+        if (error) throw new Error(`Помилка створення повідомлення: ${error.message}`);
+
+        return {
+            id: data.id,
+            text: data.content,
+            chatId: data.chat_id,
+            senderId: data.sender_id,
+            createdAt: data.created_at,
+            user: data.user,
+            is_read: false
+        };
+    },
 };
 
 export default ChatService;

@@ -16,6 +16,16 @@ const typeDefs =`
       joined_at: String
       user: User
     }
+    
+    type Message {
+      id: ID!
+      chatId: ID!      
+      userId: ID!    
+      text: String!    
+      createdAt: String! 
+      is_read: Boolean
+      user: User
+    }
 
     type Chat{
      id: ID!
@@ -28,12 +38,14 @@ const typeDefs =`
         
     type Subscription {
         chatCreated: Chat!
+        messageSent(chatId: ID!): Message!
     }
     type Query {
         me: User
         chats: [Chat!]!
         chat(id: ID!): Chat
         users: [User!]!
+        messages(chatId: ID!): [Message!]!
     }
 
     type AuthPayload {
@@ -47,6 +59,7 @@ const typeDefs =`
         register(name: String!, email: String!, password: String!): AuthPayload 
         updateUser(name: String, email: String, password: String): AuthPayload
         createChat(name: String!, description: String, memberIds: [ID!]!): Chat!
+        createMessage(chatId: ID!, text: String!): Message!
     }
 `;
 
